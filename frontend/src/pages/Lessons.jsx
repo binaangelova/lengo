@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom'; // Import useLocation to get the hash
 import AdminNavbar from '../components/Navbar';
 
 const levels = [
@@ -13,6 +13,7 @@ const levels = [
 
 const Lessons = () => {
   const [lessons, setLessons] = useState({ A1: [], A2: [], B1: [], B2: [], C1: [], C2: [] });
+  const location = useLocation(); // Get the current location to know which section is selected
 
   useEffect(() => {
     const fetchLessons = async () => {
@@ -32,16 +33,24 @@ const Lessons = () => {
     fetchLessons();
   }, []);
 
+  const activeLevel = location.hash.replace('#', ''); // Get the level ID from the hash
+
   return (
     <div className="bg-blue-100 min-h-screen flex flex-col">
       <AdminNavbar />
       <div className="flex-grow flex flex-col items-center pt-16">
-        <h1 className="text-5xl font-bold mb-4 text-blue-900">Уроци</h1>
+        <h1 className="text-5xl font-bold text-blue-900 mb-4 drop-shadow-lg text-center">Уроци</h1>
         <p className="text-xl mb-8">Изберете ниво и урок, който искате да прегледате.</p>
 
         <div className="flex flex-col space-y-10 p-10 w-full max-w-5xl mx-auto">
           {levels.map((level) => (
-            <div key={level.id} className="bg-blue-200 rounded-lg shadow-lg p-10 flex flex-col items-center w-full">
+            <div
+              key={level.id}
+              id={level.id} // Add the ID here for scrolling to the section
+              className={`bg-blue-300 rounded-xl shadow-xl p-10 flex flex-col items-center w-full ${
+                activeLevel === level.id ? 'border-4 border-blue-400/100' : ''
+              }`}
+            >
               <h2 className="text-3xl font-semibold text-blue-800 mb-10">{level.title}</h2>
 
               {lessons[level.id]?.length === 0 ? (
@@ -50,7 +59,7 @@ const Lessons = () => {
                 <div className="flex flex-wrap gap-4">
                   {lessons[level.id]?.map((lesson) => (
                     <Link to={`/lesson/${level.id}/${lesson.name}`} key={lesson._id}>
-                      <button className="bg-blue-500 text-white text-lg py-2 px-4 rounded-lg hover:bg-blue-600 transition duration-200">
+                      <button className="bg-blue-600 text-white text-md font-semibold py-2 px-4 rounded-xl shadow-lg transition duration-200 hover:bg-white hover:text-blue-900 hover:scale-105">
                         {lesson.name}
                       </button>
                     </Link>

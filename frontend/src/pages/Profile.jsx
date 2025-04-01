@@ -1,49 +1,97 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
 import { useAuth } from '../AuthContext'; // Import useAuth hook to access authentication context
+import { useNavigate } from 'react-router-dom'; // Import useNavigate hook from react-router-dom
 
 const Profile = () => {
-  const { isAuthenticated, logout } = useAuth(); // Get authentication status and logout function from context
+  const { isAuthenticated, logout, user } = useAuth(); // Get authentication status, logout, and user from context
+  const [completedTests, setCompletedTests] = useState([]);
+  const navigate = useNavigate();
   
-  // Replace these with actual user data from your authentication system
-  const user = {
-    name: "name", 
-    profilePicture: null // Add the profile picture URL or path here
-  };
+  useEffect(() => {
+    const getCompletedTests = async () => {
+      try {
+        const response = await fetch('http://localhost:5003/completed-tests', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`, // Send JWT in headers
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch completed tests');
+        }
+
+        const data = await response.json();
+        setCompletedTests(data);
+        console.log(data);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    getCompletedTests();
+  }, []);
 
   return (
     <div className="bg-blue-100 min-h-screen flex flex-col">
       <Navbar />
-      <div className="flex-grow flex-col items-center pt-8"> {/* Reduced padding from pt-16 to pt-8 */}
-        <div className="text-center p-6"> {/* Reduced padding from p-8 to p-6 */}
-          <h1 className="text-5xl font-bold mb-2 text-blue-900">Профил</h1>
+      <div className="flex-grow flex-col items-center pt-8">
+        <div className="text-center p-6">
+          <h1 className="text-5xl font-bold mb-2 text-blue-900 drop-shadow-lg">Профил</h1>
+
           {isAuthenticated && (
-            <div className="flex flex-row w-full max-w-5xl mx-auto p-6 mt-14"> {/* Reduced margin-top and padding */}
-              <div className="flex-grow text-left mr-20 mt-4"> {/* Reduced margin-top for name section */}
+            <div className="flex flex-row w-full max-w-5xl mx-auto p-6 mt-14">
+              {/* Left Column: User Info */}
+              <div className="flex-grow text-left mr-20 mt-4">
                 <p className="text-xl mb-0 pt-2 text-blue-800 flex items-center">
                   <strong className="mr-2">Име:</strong>
-                  <span className="font-semibold">{user.name}</span>
+                  <span className="font-semibold text-black">{user.username}</span>
+                </p>
+                <p className="text-xl mb-0 pt-2 text-blue-800 flex items-center">
+                  <strong className="mr-2">Имейл:</strong>
+                  <span className="font-semibold text-black">{user.email}</span>
                 </p>
                 <button
-                  onClick={logout} // Call the logout function on button click
-                  className="bg-blue-500 text-white font-bold p-3 rounded-lg hover:bg-blue-600 hover:scale-105 transition duration-200 mt-4"
+                  onClick={logout}
+                  className="bg-blue-600 text-white text-md font-semibold p-3 rounded-xl hover:bg-blue-800 transition duration-200 mt-10"
                 >
                   Излизане
                 </button>
               </div>
+
+              {/* Right Column: Completed Tests */}
               <div className="ml-4 w-4/5">
-                <div className="bg-blue-200 rounded-lg shadow-lg p-10">
-                  <p className="text-xl text-blue-800 mb-4">
+                <div className="bg-blue-300 rounded-xl shadow-xl p-10">
+                  <p className="text-xl text-blue-900 mb-4">
                     <strong>Направени до момента тестове:</strong>
                   </p>
+
                   <div className="p-5 flex flex-col gap-4">
-                    <button className="bg-white text-blue-800 font-bold p-3 rounded-lg hover:bg-gray-200 transition duration-100">Тест 1</button>
-                    <button className="bg-white text-blue-800 font-bold p-3 rounded-lg hover:bg-gray-200 transition duration-100">Тест 2</button>
-                    <button className="bg-white text-blue-800 font-bold p-3 rounded-lg hover:bg-gray-200 transition duration-100">Тест 3</button>
-                </div>
+                    {completedTests.length === 0 ? (
+                      <p className="text-black">Няма намерени тестове.</p>
+                    ) : (
+                      completedTests.map((test) => (
+                        <button
+                          key={test._id}
+                          className="bg-white text-blue-800 font-bold p-3 rounded-xl shadow-lg hover:bg-gray-200 hover:scale-105 transition duration-200"
+                          onClick={() => navigate(`/test-results/${test._id}`)}
+                        >
+                          {/* Use optional chaining (?.) to avoid errors if lessonId is missing */}
+                          {test.lessonId?.name || 'Без име'}
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
+          )}
+
+          {/* Show a warning if the user is not authenticated */}
+          {!isAuthenticated && (
+            <p className="text-red-500 mt-4">Трябва да сте влезли в профила си.</p>
           )}
         </div>
       </div>

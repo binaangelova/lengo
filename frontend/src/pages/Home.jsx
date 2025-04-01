@@ -1,6 +1,7 @@
 import React from 'react';
-import { Link } from 'react-router-dom'; // Import Link from react-router-dom
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import backgroundImage from '../images/image9.jpg';
 
 const levels = [
   { id: 'A1', title: 'A1 - Начинаещ' },
@@ -12,24 +13,51 @@ const levels = [
 ];
 
 const Home = () => {
+  const navigate = useNavigate();
+
+  const handleCardClick = (id) => {
+    navigate(`/lessons#${id}`);
+    setTimeout(() => {
+      const section = document.getElementById(id);
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
+  };
+
   return (
     <div className="bg-blue-100 min-h-screen flex flex-col">
       <Navbar />
-      <div className="flex-grow flex flex-col items-center pt-16">
-        <div className="text-center p-8">
-          <h1 className="text-5xl font-bold mb-2 text-blue-900">Добре дошли в LenGo!</h1>
-          <p className="text-xl mb-0 pt-2">Вашият спътник в изучаването на английския език.</p>
+
+      {/* Heading Section with Background Image */}
+      <div className="relative w-full flex flex-col items-center justify-center h-56">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-blue-500 opacity-50"
+          style={{ backgroundImage: `url(${backgroundImage})` }}
+        ></div>
+        <div className="relative text-center p-8">
+          <h1 className="text-5xl font-extrabold text-blue-900 mb-4 
+          ">
+            Добре дошли в <span className="text-blue-700">LenGo!</span>
+          </h1>
+          <p className="text-xl">Вашият спътник в изучаването на английския език.</p>
         </div>
-        {/* Cards Section */}
-        <div className="grid grid-cols-3 gap-10 p-20">
+      </div>
+
+      {/* Cards Section */}
+      <div className="flex-grow flex flex-col items-center">
+        <h2 className="text-4xl font-bold text-blue-900 mt-6 mb-2 drop-shadow-lg">Нива:</h2>
+
+        <div className="grid grid-cols-3 gap-10 p-12">
           {levels.map((level) => (
-            <Link
+            <button
               key={level.id}
-              to={`/lessons#${level.id}`} // Use the hash to navigate to the section in Lessons page
-              className="bg-blue-200 rounded-lg shadow-lg p-8 flex flex-col items-center hover:bg-blue-300 hover:scale-105 transition duration-200"
+              onClick={() => handleCardClick(level.id)}
+              className="bg-blue-300 rounded-2xl shadow-xl p-8 flex flex-col items-center 
+              hover:bg-white hover:scale-105 transition duration-300"
             >
-              <h2 className="text-3xl font-semibold text-blue-800">{level.title}</h2>
-            </Link>
+              <h3 className="text-3xl font-semibold text-blue-900">{level.title}</h3>
+            </button>
           ))}
         </div>
       </div>

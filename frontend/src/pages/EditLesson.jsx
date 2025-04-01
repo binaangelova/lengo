@@ -70,6 +70,11 @@ const EditLesson = () => {
     }
   };
 
+  const handleReset = () => {
+    setQuestions([{ question: '', options: ['', '', ''], correctAnswer: '' }]);
+    setError(null);
+  };
+
   const handleVocabularyChange = (index, field, value) => {
     const updatedVocabulary = [...vocabulary];
     updatedVocabulary[index][field] = value;
@@ -106,38 +111,56 @@ const EditLesson = () => {
   };
 
   const handleSaveTest = async () => {
+    console.log('Saving test...');
     setIsLoading(true);
 
+    // Ensure testId is a string
+    const id = testId._id ? testId._id : testId;
+    console.log('Extracted Test ID:', id);
+
+    if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
+        console.error('Invalid Test ID:', id);
+        alert('Invalid Test ID.');
+        setIsLoading(false);
+        return;
+    }
+
     const test = { questions };
+    console.log('Test data:', test);
 
     try {
-      const response = await fetch(`http://localhost:5003/tests/${testId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(test),
-      });
+        const response = await fetch(`http://localhost:5003/tests/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(test),
+        });
 
-      if (response.ok) {
-        alert('Тестът е обновен успешно!');
-      } else {
-        alert('Грешка при обновяване на теста.');
-      }
+        console.log('Response status:', response.status);
+
+        if (response.ok) {
+            alert('Тестът е обновен успешно!');
+        } else {
+            alert('Грешка при обновяване на теста.');
+        }
     } catch (err) {
-      alert('Грешка при свързването със сървъра.');
+        console.error('Error:', err);
+        alert('Грешка при свързването със сървъра.');
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
+        console.log('Test save process completed.');
     }
-  };
+};
+
 
   return (
     <div className="bg-blue-100 min-h-screen flex flex-col">
       <AdminNavbar />
       <div className="flex-grow flex flex-col items-center pt-16">
         <div className="text-center p-4">
-          <h1 className="text-5xl font-bold mb-4 text-blue-900">Редактиране на урок</h1>
-          <p className="text-xl text-blue-800">Тук можете да редактирате урока.</p>
+          <h1 className="text-5xl font-bold mb-4 text-blue-900 drop-shadow-lg">Редактиране на урок</h1>
+          <p className="text-xl text-black">Тук можете да редактирате урока.</p>
         </div>
-        <div className="bg-blue-200 rounded-lg shadow-lg p-10 w-full max-w-3xl mx-auto mt-8">
+        <div className="bg-blue-300 rounded-xl shadow-xl p-10 w-full max-w-4xl mx-auto mt-8">
           <div className="mb-8">
             <label className="block text-3xl font-bold mb-4 text-blue-900">Име на урока</label>
             <input
@@ -145,7 +168,7 @@ const EditLesson = () => {
               value={lessonNameInput}
               onChange={(e) => setLessonName(e.target.value)}
               placeholder="Въведете име на урока"
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              className="w-full p-2 border border-gray-400 rounded-lg shadow-md"
             />
           </div>
           <div className="mb-8">
@@ -153,7 +176,7 @@ const EditLesson = () => {
             <select
               value={level}
               onChange={(e) => setLevel(e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              className="w-full p-2 border border-gray-400 rounded-lg shadow-md"
             >
               <option value="A1">A1</option>
               <option value="A2">A2</option>
@@ -172,20 +195,20 @@ const EditLesson = () => {
                   value={word.bulgarian}
                   onChange={(e) => handleVocabularyChange(index, 'bulgarian', e.target.value)}
                   placeholder="Българска дума"
-                  className="flex-1 p-2 border border-gray-300 rounded-lg mr-4"
+                  className="flex-1 p-2 border border-gray-400 rounded-lg mr-4 shadow-md"
                 />
                 <input
                   type="text"
                   value={word.english}
                   onChange={(e) => handleVocabularyChange(index, 'english', e.target.value)}
                   placeholder="Превод на английски"
-                  className="flex-1 p-2 border border-gray-300 rounded-lg"
+                  className="flex-1 p-2 border border-gray-400 rounded-lg shadow-md"
                 />
               </div>
             ))}
             <button
               onClick={handleAddVocabulary}
-              className="mt-4 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600"
+              className="mt-4 bg-blue-600 text-white text-md font-semibold py-2 px-4 rounded-xl shadow-lg hover:bg-blue-700"
             >
               Добавяне на нова дума
             </button>
@@ -196,11 +219,11 @@ const EditLesson = () => {
               value={grammar}
               onChange={(e) => setGrammar(e.target.value)}
               placeholder="Добавете текст за граматика"
-              className="w-full p-4 border border-gray-300 rounded-lg"
+              className="w-full p-4 border border-gray-400 rounded-lg shadow-md"
               rows="5"
             />
           </div>
-          <div className="bg-gray-100 p-6 rounded-lg shadow-lg">
+          <div className="bg-gray-100 p-6 rounded-lg shadow-lg border border-gray-400">
             {questions.map((q, index) => (
               <div key={index} className="mb-6">
                 <label className="block text-xl font-semibold text-blue-900">Въпрос {index + 1}</label>
@@ -209,7 +232,7 @@ const EditLesson = () => {
                   value={q.question}
                   onChange={(e) => handleQuestionChange(index, e.target.value)}
                   placeholder="Въведете въпрос"
-                  className="w-full p-2 mb-4 border border-gray-300 rounded-lg"
+                  className="w-full p-2 mb-4 border border-gray-400 rounded-lg shadow-md"
                 />
                 <label className="block text-xl font-semibold text-blue-900">Опции</label>
                 {q.options.map((option, i) => (
@@ -227,7 +250,7 @@ const EditLesson = () => {
                       value={option}
                       onChange={(e) => handleOptionChange(index, i, e.target.value)}
                       placeholder={`Опция ${i + 1}`}
-                      className="flex-1 p-2 border border-gray-300 rounded-lg"
+                      className="flex-1 p-2 border border-gray-400 rounded-lg shadow-md"
                     />
                   </div>
                 ))}
@@ -235,24 +258,33 @@ const EditLesson = () => {
             ))}
             <button
               onClick={handleAddQuestion}
-              className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 mb-4"
+              className="bg-blue-400 text-white font-extrabold text-md py-2 px-4 rounded-xl shadow-lg mb-8 hover:bg-blue-600 transition duration-200"
             >
-              Добавяне на нов въпрос
+              +
             </button>
 
             {/* Save Test Button */}
-            <button
-              onClick={handleSaveTest}
-              className="bg-blue-700 text-white py-3 px-6 rounded-lg hover:bg-blue-800 w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Записване на тест...' : 'Записване на теста'}
-            </button>
-          </div>
-
+          <div className="flex justify-center mb-4 gap-6">
+          <button
+          onClick={handleSaveTest}
+          className={`bg-blue-600 text-white py-3 px-6 rounded-xl text-md font-semibold shadow-lg hover:bg-blue-800 transition duration-200 ${
+            isLoading ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
+          disabled={isLoading}
+        >
+          {isLoading ? 'Запазване...' : 'Запазване на теста'}
+        </button>
+        <button
+          onClick={handleReset}
+          className="bg-sky-500 text-white py-3 px-5 rounded-xl text-md font-semibold shadow-lg hover:bg-sky-700 transition duration-200"
+        >
+          Изчистване
+        </button>
+        </div>
+        </div>
           <button
             onClick={handleSaveLesson}
-            className="bg-blue-700 text-white py-3 px-6 rounded-lg hover:bg-blue-800 w-full"
+            className="bg-blue-600 text-white py-3 px-6 rounded-xl text-md font-semibold shadow-lg hover:bg-blue-800 w-full mt-8 transition duration-200"
             disabled={isLoading}
           >
             {isLoading ? 'Записване...' : 'Записване на урока'}

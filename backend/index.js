@@ -30,6 +30,7 @@ const connectDB = async () => {
   }
 };
 
+
 // Endpoint for creating lessons
 app.post('/lessons', async (req, res) => {
   try {
@@ -152,6 +153,54 @@ app.get('/tests', async (req, res) => {
   }
 });
 
+app.get('/completed-tests', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication token is required.' });
+    }
+
+    // Verify the token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({ error: 'Invalid or expired token.' });
+    }
+
+    // Extract user ID from the decoded token
+    const userId = decoded.id;
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid token: user ID missing.' });
+    }
+    const completedTests = await TestResult.find({ userId }).populate('lessonId');
+
+    res.json(completedTests);
+  } catch (error) {
+    console.error('Error fetching tests:', error);
+    res.status(500).json({ error: 'Error fetching tests.' });
+  }
+});
+
+app.get('/completed-tests/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params; // Get userId from URL params
+
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required.' });
+    }
+
+    const completedTests = await TestResult.find({ userId }).populate('lessonId');
+
+    res.json(completedTests);
+  } catch (error) {
+    console.error('Error fetching tests:', error);
+    res.status(500).json({ error: 'Error fetching tests.' });
+  }
+});
+
+
 // PUT endpoint for updating lessons
 app.put('/lessons/:id', async (req, res) => {
   const lessonId = req.params.id;
@@ -172,6 +221,28 @@ app.put('/lessons/:id', async (req, res) => {
     res.status(200).json({ lesson: updatedLesson });
   } catch (err) {
     res.status(500).json({ error: 'Грешка при обновяването на урока.' });
+  }
+});
+
+// Delete a lesson by ID
+app.delete('/lessons/:id', async (req, res) => {
+  try {
+    const lesson = await Lesson.findById(req.params.id);
+    if (!lesson) {
+      return res.status(404).json({ message: 'Lesson not found' });
+    }
+
+    // If lesson has a test, delete the test
+    if (lesson.test) {
+      await Test.findByIdAndDelete(lesson.test);
+    }
+
+    // Delete the lesson
+    await Lesson.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Lesson and its test deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
   }
 });
 
@@ -206,16 +277,33 @@ app.put('/tests/:id', async (req, res) => {
 
 app.post('/submitTestResults', async (req, res) => {
   try {
-    const { lessonId, answers } = req.body;
+    const { lessonId, answers, token } = req.body; // Remove token from the body, we'll extract it from headers
 
-    // Check if the request body has the required data
     if (!lessonId || !answers) {
       return res.status(400).json({ error: 'Lesson ID and answers are required.' });
     }
+    // Extract the token from request headers instead of body
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication token is required.' });
+    }
 
-    console.log('Received test results:', lessonId, answers);
+    // Verify the token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({ error: 'Invalid or expired token.' });
+    }
 
-    // Create and save the test result
+    // Extract user ID from the decoded token
+    const userId = decoded.id;
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid token: user ID missing.' });
+    }
+
+    console.log('Received test results:', lessonId, answers, 'for user:', userId);
+
+    // Save the test result
     const newTestResult = new TestResult({
       lessonId,
       userId,
@@ -224,7 +312,7 @@ app.post('/submitTestResults', async (req, res) => {
 
     await newTestResult.save();
 
-    res.status(200).json({ message: 'Test submitted successfully!' });
+    res.status(200).json(newTestResult);
   } catch (error) {
     console.error('Error during test submission:', error);
     res.status(500).json({ error: 'Error submitting test results.' });
@@ -232,13 +320,21 @@ app.post('/submitTestResults', async (req, res) => {
 });
 
 
-app.get('/getTestResults/:lessonId', async (req, res) => {
+
+app.get('/getTestResult/:testResultId', async (req, res) => {
   try {
-    const { lessonId } = req.params;
+    const { testResultId } = req.params;
 
     // Fetch the test result by lesson ID
-    const testResult = await TestResult.findOne({ lessonId }).populate('lessonId');
-
+    console.log(testResultId);
+    const testResult = await TestResult.findById(testResultId).populate({
+      path: 'lessonId',
+      populate: {
+        path: 'test', // Populate the test field in the lesson
+        model: 'Test', // Specify the Test model
+      },
+    });
+    console.log(testResult)
     if (!testResult) {
       return res.status(404).json({ error: 'Test results not found for this lesson.' });
     }
@@ -266,20 +362,31 @@ app.get('/getTestResults/:lessonId', async (req, res) => {
 // Endpoint for registering a user
 app.post('/register', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, email, role } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required.' });
+    // Check if all required fields are provided
+    if (!username || !password || !email) {
+      return res.status(400).json({ error: 'Username, password, and email are required.' });
     }
 
-    const existingUser = await User.findOne({ username });
+    // Check if the user or email already exists
+    const existingUser = await User.findOne({ $or: [{ username }, { email }] });
     if (existingUser) {
-      return res.status(400).json({ error: 'User already exists.' });
+      return res.status(400).json({ error: 'Username or email already in use.' });
     }
 
+    // Default role to 'user' if not provided
+    const userRole = role || 'user';
+
+    // Hash the password before saving
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ username, password: hashedPassword });
+
+    // Create a new user
+    const user = new User({ username, password: hashedPassword, email, role: userRole });
+
+    // Save the user to the database
     await user.save();
+
     res.status(201).json({ message: 'User registered successfully.' });
   } catch (error) {
     console.error('Error registering user:', error);
@@ -296,21 +403,67 @@ app.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required.' });
     }
 
+    // Find user by username
     const user = await User.findOne({ username });
     if (!user) {
       return res.status(400).json({ error: 'User not found.' });
     }
 
+    // Check if the password matches
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ error: 'Invalid credentials.' });
     }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-    res.json({ token });
+    // Generate JWT token with role
+    const token = jwt.sign(
+      { id: user._id, role: user.role }, // Include role in the token
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.json({ token, isAdmin: user.role === 'admin' }); // Send role status
   } catch (error) {
     console.error('Error logging in user:', error);
     res.status(500).json({ error: 'Server error during login.' });
+  }
+});
+
+
+app.get('/user', async (req, res) => {
+  try {
+    // Extract the token from the Authorization header
+    const token = req.headers.authorization?.split(' ')[1];
+
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication token is required.' });
+    }
+
+    // Verify the token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (error) {
+      return res.status(401).json({ error: 'Invalid or expired token.' });
+    }
+
+    // Extract user ID from the decoded token
+    const userId = decoded.id;
+    if (!userId) {
+      return res.status(400).json({ error: 'Invalid token: user ID missing.' });
+    }
+
+    // Fetch the user but EXCLUDE the password field
+    const user = await User.findById(userId).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ error: 'Server error while fetching user.' });
   }
 });
 
@@ -333,7 +486,7 @@ app.get('/users/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid user ID format.' });
     }
 
-    const user = await User.findById(id, 'username _id');
+    const user = await User.findById(id, 'username _id email'); // Include 'email' in the fields
     if (!user) {
       return res.status(404).json({ error: 'User not found.' });
     }
@@ -344,6 +497,21 @@ app.get('/users/:id', async (req, res) => {
     res.status(500).json({ error: 'Error fetching user details.' });
   }
 });
+
+// DELETE user by ID
+app.delete('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedUser = await User.findByIdAndDelete(id);
+    if (!deletedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting user' });
+  }
+});
+
 
 // Start the server after connecting to MongoDB
 connectDB().then(() => {

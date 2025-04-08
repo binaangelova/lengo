@@ -51,7 +51,6 @@ const LessonEditor = () => {
       });
 
       if (response.ok) {
-        alert(`Урокът "${lessonName}" е запазен успешно!`);
         setLessonName('');
         setLevel('A1');
         setVocabulary([{ bulgarian: '', english: '' }]);
@@ -114,8 +113,7 @@ const LessonEditor = () => {
 
         if (response.ok) {
           const { _id } = await response.json();
-          handleTestSave(_id); // Pass the test ID to the parent
-          alert('Тестът е запазен успешно!');
+          handleTestSave(_id);
           handleReset(); // Reset the form after successful save
         } else {
           const errorData = await response.json();

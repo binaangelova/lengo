@@ -43,7 +43,6 @@ const LessonTemplate = () => {
 
       const result = await response.json();
       if (response.ok) {
-        alert('Тестът беше изпратен успешно!');
         navigate(`/test-results/${result._id}`, {
           state: {
             lessonName,

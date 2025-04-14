@@ -12,7 +12,7 @@ const LessonTemplate = () => {
 
   useEffect(() => {
     const fetchLesson = async () => {
-      const response = await fetch(`http://localhost:5003/lessons/${levelId}/${lessonName}`);
+      const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${levelId}/${lessonName}`);
       const data = await response.json();
       setLesson(data);
     };
@@ -29,7 +29,7 @@ const LessonTemplate = () => {
   const handleSubmit = async () => {
     console.log('Test submitted with answers:', selectedAnswers);
     try {
-      const response = await fetch('http://localhost:5003/submitTestResults', {
+      const response = await fetch('https://lengo-vz4i.onrender.com/submitTestResults', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

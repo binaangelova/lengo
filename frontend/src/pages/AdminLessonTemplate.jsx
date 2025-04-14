@@ -11,7 +11,7 @@ const AdminLessonTemplate = () => {
 
   useEffect(() => {
     const fetchLesson = async () => {
-      const response = await fetch(`http://localhost:5003/lessons/${levelId}/${lessonName}`);
+      const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${levelId}/${lessonName}`);
       const data = await response.json();
       setLesson(data); 
     };
@@ -55,7 +55,7 @@ const AdminLessonTemplate = () => {
   const handleDelete = async () => {
     if (window.confirm('Сигурни ли сте, че искате да изтриете този урок?')) {
       try {
-        const response = await fetch(`http://localhost:5003/lessons/${lesson._id}`, {
+        const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${lesson._id}`, {
           method: 'DELETE',
         });
   

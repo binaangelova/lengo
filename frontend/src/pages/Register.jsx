@@ -18,7 +18,7 @@ const Register = () => {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:5003/register', {
+      const response = await fetch('https://lengo-vz4i.onrender.com/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, email }),

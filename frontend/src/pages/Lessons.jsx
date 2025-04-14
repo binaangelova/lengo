@@ -18,7 +18,7 @@ const Lessons = () => {
   useEffect(() => {
     const fetchLessons = async () => {
       try {
-        const response = await fetch('http://localhost:5003/lessons');
+        const response = await fetch('https://lengo-vz4i.onrender.com/lessons');
         const data = await response.json();
         const groupedLessons = levels.reduce((acc, level) => {
           acc[level.id] = data.filter((lesson) => lesson.level === level.id);

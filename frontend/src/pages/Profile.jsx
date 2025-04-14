@@ -11,7 +11,7 @@ const Profile = () => {
   useEffect(() => {
     const getCompletedTests = async () => {
       try {
-        const response = await fetch('http://localhost:5003/completed-tests', {
+        const response = await fetch('https://lengo-vz4i.onrender.com/completed-tests', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

@@ -19,7 +19,7 @@ const EditLesson = () => {
   useEffect(() => {
     const fetchLesson = async () => {
       try {
-        const response = await fetch(`http://localhost:5003/lessons/${lessonId}`);
+        const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${lessonId}`);
         const data = await response.json();
         if (data) {
           setLessonName(data.name);
@@ -51,7 +51,7 @@ const EditLesson = () => {
     const lesson = { name: lessonNameInput, level, vocabulary, grammar, test: testId };
 
     try {
-      const response = await fetch(`http://localhost:5003/lessons/${lessonId}`, {
+      const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${lessonId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(lesson),
@@ -128,7 +128,7 @@ const EditLesson = () => {
     console.log('Test data:', test);
 
     try {
-        const response = await fetch(`http://localhost:5003/tests/${id}`, {
+        const response = await fetch(`https://lengo-vz4i.onrender.com/tests/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(test),

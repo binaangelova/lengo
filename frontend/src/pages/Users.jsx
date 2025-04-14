@@ -9,7 +9,7 @@ const Users = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch('http://localhost:5003/users');
+        const response = await fetch('https://lengo-vz4i.onrender.com/users');
         if (!response.ok) {
           throw new Error('Failed to fetch users');
         }
@@ -32,7 +32,7 @@ const Users = () => {
 
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`http://localhost:5003/users/${id}`, {
+      const response = await fetch(`https://lengo-vz4i.onrender.com/users/${id}`, {
         method: 'DELETE',
       });
   

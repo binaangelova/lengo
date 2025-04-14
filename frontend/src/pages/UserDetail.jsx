@@ -13,7 +13,7 @@ const UserDetail = () => {
     // Fetch user details
     const fetchUser = async () => {
       try {
-        const response = await fetch(`http://localhost:5003/users/${userId}`);
+        const response = await fetch(`https://lengo-vz4i.onrender.com/users/${userId}`);
         if (!response.ok) {
           throw new Error('Failed to fetch user details');
         }
@@ -27,7 +27,7 @@ const UserDetail = () => {
     // Fetch completed tests for this user
     const getCompletedTests = async () => {
       try {
-        const response = await fetch(`http://localhost:5003/completed-tests/${userId}`, {
+        const response = await fetch(`https://lengo-vz4i.onrender.com/completed-tests/${userId}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',

@@ -58,8 +58,7 @@ const EditLesson = () => {
       });
 
       if (response.ok) {
-        alert(`Урокът "${lessonNameInput}" е обновен успешно!`);
-        navigate(`/admin/lessons/${level}/${lessonNameInput}`); // Navigate back to the lesson page after saving
+        navigate(`/admin/lessons/${level}/${lessonNameInput}`); 
       } else {
         alert('Грешка при обновяване на урока.');
       }

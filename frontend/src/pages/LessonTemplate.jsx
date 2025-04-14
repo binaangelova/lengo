@@ -29,7 +29,7 @@ const LessonTemplate = () => {
   const handleSubmit = async () => {
     console.log('Test submitted with answers:', selectedAnswers);
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/submitTestResults`, {
+      const response = await fetch('http://localhost:5003/submitTestResults', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

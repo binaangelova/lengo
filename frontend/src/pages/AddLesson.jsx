@@ -17,7 +17,7 @@ const AddLesson = () => {
   useEffect(() => {
     const fetchLessons = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/lessons`);
+        const response = await fetch('http://localhost:5003/lessons');
         const data = await response.json();
         const groupedLessons = levels.reduce((acc, level) => {
           acc[level.id] = data.filter((lesson) => lesson.level === level.id);

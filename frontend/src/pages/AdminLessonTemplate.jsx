@@ -11,7 +11,7 @@ const AdminLessonTemplate = () => {
 
   useEffect(() => {
     const fetchLesson = async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/lessons/${levelId}/${lessonName}`);
+      const response = await fetch(`http://localhost:5003/lessons/${levelId}/${lessonName}`);
       const data = await response.json();
       setLesson(data); 
     };

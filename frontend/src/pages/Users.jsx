@@ -9,7 +9,7 @@ const Users = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/users`);
+        const response = await fetch('http://localhost:5003/users');
         if (!response.ok) {
           throw new Error('Failed to fetch users');
         }

@@ -11,7 +11,7 @@ const TestResults = () => {
 
   const fetchResults = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/getTestResult/${testResultId}`);
+      const response = await fetch(`http://localhost:5003/getTestResult/${testResultId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch user details');
       }

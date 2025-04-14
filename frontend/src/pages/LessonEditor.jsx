@@ -44,7 +44,7 @@ const LessonEditor = () => {
     const lesson = { name: lessonName, level, vocabulary, grammar, test: testId };
 
     try {
-      const response = await fetch('http://localhost:5003/lessons', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/lessons`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(lesson),
@@ -105,7 +105,7 @@ const LessonEditor = () => {
     if (validateForm()) {
       setIsLoading(true);
       try {
-        const response = await fetch('http://localhost:5003/tests', {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/tests`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ questions }),

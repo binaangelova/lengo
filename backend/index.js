@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const nodeCrypto = require('crypto');
 require('dotenv').config();
 const rateLimit = require('express-rate-limit');
 const errorHandler = require('./middleware/error');
@@ -47,7 +48,7 @@ app.use(helmet({
       scriptSrc: ["'self'"],  // Removed unsafe-inline
       styleSrc: ["'self'"],   // Removed unsafe-inline
       imgSrc: ["'self'"],     // Restricted to only same origin
-      connectSrc: ["'self'", "https://lengo-learn.vercel.app/" || 'http://localhost:5173'],
+      connectSrc: ["'self'", "https://lengo-learn.vercel.app", "http://localhost:5173"],
       formAction: ["'self'"], // Restrict form submissions to same origin
       frameAncestors: ["'none'"], // Prevent iframe embedding
       objectSrc: ["'none'"],  // Prevent object/embed elements
@@ -418,7 +419,6 @@ app.post('/submitTestResults', authenticateToken, async (req, res) => {
 });
 
 
-
 app.get('/getTestResult/:testResultId', async (req, res) => {
   try {
     const { testResultId } = req.params;
@@ -522,11 +522,11 @@ app.post('/login', async (req, res) => {
         email: user.email 
       },
       process.env.JWT_SECRET,
-      { expiresIn: '24h' } // Extended token lifetime to 24 hours
+      { expiresIn: '24h' }
     );
 
-    // Generate CSRF token
-    const csrfToken = crypto.randomBytes(32).toString('hex');
+    // Generate CSRF token using Node's crypto module
+    const csrfToken = nodeCrypto.randomBytes(32).toString('hex');
 
     res.json({ 
       token, 

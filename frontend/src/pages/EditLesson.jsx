@@ -24,14 +24,24 @@ const EditLesson = () => {
         if (data) {
           setLessonName(data.name);
           setLevel(data.level);
-          setVocabulary(data.vocabulary);
-          setGrammar(data.grammar);
+          setVocabulary(Array.isArray(data.vocabulary) ? data.vocabulary : [{ bulgarian: '', english: '' }]);
+          setGrammar(data.grammar || '');
           if (data.test) {
             setTestId(data.test);
-            setQuestions(data.test.questions || [{ question: '', options: ['', '', ''], correctAnswer: '' }]);
+            // Ensure questions array is properly initialized
+            const questionsData = data.test.questions || [];
+            setQuestions(questionsData.length > 0 ? questionsData : [{ 
+              question: '', 
+              options: ['', '', ''], 
+              correctAnswer: '' 
+            }]);
           } else {
             setTestId(null);
-            setQuestions([{ question: '', options: ['', '', ''], correctAnswer: '' }]);
+            setQuestions([{ 
+              question: '', 
+              options: ['', '', ''], 
+              correctAnswer: '' 
+            }]);
           }
         }
       } catch (err) {
@@ -126,6 +136,32 @@ const EditLesson = () => {
 
     if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
         setError('Invalid Test ID');
+        setIsLoading(false);
+        return;
+    }
+
+    // Validate questions data
+    if (!Array.isArray(questions) || questions.length === 0) {
+        setError('No questions available');
+        setIsLoading(false);
+        return;
+    }
+
+    // Ensure all questions have valid data
+    const isValid = questions.every(q => 
+        q && 
+        typeof q.question === 'string' && 
+        q.question.trim() && 
+        Array.isArray(q.options) && 
+        q.options.length >= 2 && 
+        q.options.every(opt => typeof opt === 'string' && opt.trim()) &&
+        typeof q.correctAnswer === 'string' &&
+        q.correctAnswer.trim() &&
+        q.options.includes(q.correctAnswer)
+    );
+
+    if (!isValid) {
+        setError('Please fill in all questions with valid data. Each question must have a question text, at least 2 options, and a correct answer selected from the options.');
         setIsLoading(false);
         return;
     }
@@ -228,19 +264,20 @@ const EditLesson = () => {
               rows="5"
             />
           </div>
+          {/* Test Section */}
           <div className="bg-gray-100 p-6 rounded-lg shadow-lg border border-gray-400">
-            {questions.map((q, index) => (
+            {Array.isArray(questions) && questions.map((q, index) => (
               <div key={index} className="mb-6">
                 <label className="block text-xl font-semibold text-blue-900">Въпрос {index + 1}</label>
                 <input
                   type="text"
-                  value={q.question}
+                  value={q.question || ''}
                   onChange={(e) => handleQuestionChange(index, e.target.value)}
                   placeholder="Въведете въпрос"
                   className="w-full p-2 mb-4 border border-gray-400 rounded-lg shadow-md"
                 />
                 <label className="block text-xl font-semibold text-blue-900">Опции</label>
-                {q.options.map((option, i) => (
+                {Array.isArray(q.options) && q.options.map((option, i) => (
                   <div key={i} className="flex items-center mb-2">
                     <input
                       type="radio"
@@ -252,7 +289,7 @@ const EditLesson = () => {
                     />
                     <input
                       type="text"
-                      value={option}
+                      value={option || ''}
                       onChange={(e) => handleOptionChange(index, i, e.target.value)}
                       placeholder={`Опция ${i + 1}`}
                       className="flex-1 p-2 border border-gray-400 rounded-lg shadow-md"

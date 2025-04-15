@@ -1,11 +1,4 @@
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
-
-// Generate CSRF token
-const generateCSRFToken = () => {
-  return crypto.randomBytes(32).toString('hex');
-};
-
 const authenticateToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1];
   

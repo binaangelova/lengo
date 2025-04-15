@@ -2,6 +2,10 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
+const rateLimit = require('express-rate-limit');
+const errorHandler = require('./middleware/error');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
 
 const User = require('./models/User');
 const Test = require('./models/Test');
@@ -11,8 +15,91 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const app = express();
-app.use(cors());
-app.use(express.json());
+
+// Increase payload size limits for file uploads and large requests
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Enhanced security middleware
+app.use(cors({
+  origin: ['https://lengo-learn.vercel.app', 'http://localhost:5173'], // Allow both production and development URLs
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token']
+}));
+app.use(express.json({ limit: '10mb' })); // Limit payload size
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Import middleware
+const { authenticateToken, isAdmin } = require('./middleware/auth');
+const { validateRegistration, validateLesson, validateTest } = require('./middleware/validation');
+const sanitizeMiddleware = require('./middleware/sanitize');
+
+// Security middleware
+// Security middleware with enhanced configuration
+// Apply sanitization middleware globally
+app.use(sanitizeMiddleware);
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],  // Removed unsafe-inline
+      styleSrc: ["'self'"],   // Removed unsafe-inline
+      imgSrc: ["'self'"],     // Restricted to only same origin
+      connectSrc: ["'self'", "https://lengo-learn.vercel.app/" || 'http://localhost:5173'],
+      formAction: ["'self'"], // Restrict form submissions to same origin
+      frameAncestors: ["'none'"], // Prevent iframe embedding
+      objectSrc: ["'none'"],  // Prevent object/embed elements
+      baseUri: ["'self'"],    // Restrict base URI
+      upgradeInsecureRequests: [] // Force HTTPS
+    }
+  },
+  crossOriginEmbedderPolicy: true,
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "same-site" },
+  dnsPrefetchControl: { allow: false },
+  frameguard: { action: "deny" },
+  hsts: { 
+    maxAge: 31536000, 
+    includeSubDomains: true,
+    preload: true 
+  },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  noSniff: true, // Prevent MIME type sniffing
+  permittedCrossDomainPolicies: "none", // Restrict Adobe Flash and PDF content
+  xssFilter: true // Enable XSS filter in older browsers
+}));
+
+// Prevent MongoDB injection and cross-site scripting (XSS)
+app.use(mongoSanitize());
+app.use((req, res, next) => {
+  // Sanitize request body, query, and params
+  const sanitize = (obj) => {
+    for (let key in obj) {
+      if (typeof obj[key] === 'string') {
+        obj[key] = obj[key]
+          .replace(/javascript:/gi, '')
+          .replace(/[<>]/g, '');
+      } else if (typeof obj[key] === 'object') {
+        sanitize(obj[key]);
+      }
+    }
+  };
+  
+  sanitize(req.body);
+  sanitize(req.query);
+  sanitize(req.params);
+  next();
+});
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
+});
+app.use('/api/', limiter); // Apply rate limiting to all routes
 
 const PORT = process.env.PORT || 5003;
 
@@ -22,8 +109,31 @@ const connectDB = async () => {
     await mongoose.connect(process.env.MONGODB_URI, {
       useNewUrlParser: true,
       useUnifiedTopology: true,
+      // Add security options
+      ssl: true,
+      authSource: 'admin',
+      retryWrites: true,
+      w: 'majority',
+      serverSelectionTimeoutMS: 5000, // Timeout after 5 seconds
+      socketTimeoutMS: 45000, // Close sockets after 45 seconds
     });
     console.log('Connected to MongoDB');
+
+    // Handle connection errors
+    mongoose.connection.on('error', (err) => {
+      console.error('MongoDB connection error:', err);
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      console.warn('MongoDB disconnected. Attempting to reconnect...');
+    });
+
+    process.on('SIGINT', async () => {
+      await mongoose.connection.close();
+      console.log('MongoDB connection closed through app termination');
+      process.exit(0);
+    });
+
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
     process.exit(1);
@@ -32,7 +142,7 @@ const connectDB = async () => {
 
 
 // Endpoint for creating lessons
-app.post('/lessons', async (req, res) => {
+app.post('/lessons', authenticateToken, isAdmin, validateLesson, async (req, res) => {
   try {
     const { name, level, vocabulary, grammar } = req.body;
 
@@ -117,7 +227,7 @@ app.get('/lessons/:levelId/:lessonName', async (req, res) => {
 
 
 // Endpoint for creating tests
-app.post('/tests', async (req, res) => {
+app.post('/tests', authenticateToken, isAdmin, validateTest, async (req, res) => {
   try {
     const { questions } = req.body;
 
@@ -202,7 +312,7 @@ app.get('/completed-tests/:userId', async (req, res) => {
 
 
 // PUT endpoint for updating lessons
-app.put('/lessons/:id', async (req, res) => {
+app.put('/lessons/:id', authenticateToken, isAdmin, validateLesson, async (req, res) => {
   const lessonId = req.params.id;
   const { name, level, vocabulary, grammar, test } = req.body;
 
@@ -275,28 +385,16 @@ app.put('/tests/:id', async (req, res) => {
   }
 });
 
-app.post('/submitTestResults', async (req, res) => {
+app.post('/submitTestResults', authenticateToken, async (req, res) => {
   try {
-    const { lessonId, answers, token } = req.body; // Remove token from the body, we'll extract it from headers
+    const { lessonId, answers } = req.body;
 
     if (!lessonId || !answers) {
       return res.status(400).json({ error: 'Lesson ID and answers are required.' });
     }
-    // Extract the token from request headers instead of body
-    if (!token) {
-      return res.status(401).json({ error: 'Authentication token is required.' });
-    }
 
-    // Verify the token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (error) {
-      return res.status(401).json({ error: 'Invalid or expired token.' });
-    }
-
-    // Extract user ID from the decoded token
-    const userId = decoded.id;
+    // User ID is now available from authenticateToken middleware
+    const userId = req.user.id;
     if (!userId) {
       return res.status(400).json({ error: 'Invalid token: user ID missing.' });
     }
@@ -415,14 +513,26 @@ app.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Invalid credentials.' });
     }
 
-    // Generate JWT token with role
+    // Generate JWT token with role and extended expiration
     const token = jwt.sign(
-      { id: user._id, role: user.role }, // Include role in the token
+      { 
+        id: user._id, 
+        role: user.role,
+        username: user.username,
+        email: user.email 
+      },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' }
+      { expiresIn: '24h' } // Extended token lifetime to 24 hours
     );
 
-    res.json({ token, isAdmin: user.role === 'admin' }); // Send role status
+    // Generate CSRF token
+    const csrfToken = crypto.randomBytes(32).toString('hex');
+
+    res.json({ 
+      token, 
+      isAdmin: user.role === 'admin',
+      csrfToken 
+    });
   } catch (error) {
     console.error('Error logging in user:', error);
     res.status(500).json({ error: 'Server error during login.' });
@@ -499,7 +609,7 @@ app.get('/users/:id', async (req, res) => {
 });
 
 // DELETE user by ID
-app.delete('/users/:id', async (req, res) => {
+app.delete('/users/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const deletedUser = await User.findByIdAndDelete(id);
@@ -512,6 +622,8 @@ app.delete('/users/:id', async (req, res) => {
   }
 });
 
+// Add error handling middleware last
+app.use(errorHandler);
 
 // Start the server after connecting to MongoDB
 connectDB().then(() => {

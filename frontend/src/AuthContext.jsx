@@ -24,7 +24,7 @@ export const AuthProvider = ({ children }) => {
             console.warn('JWT token is expired. Logging out.');
             logout();
           } else {
-            const response = await fetch('http://localhost:5003/user', {
+            const response = await fetch('https://lengo-vz4i.onrender.com/user', {
               method: 'GET',
               headers: {
                 'Content-Type': 'application/json',

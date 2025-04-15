@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom'; // Import useLocation to get the hash
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AdminNavbar from '../components/Navbar';
 
 const levels = [
@@ -12,16 +12,31 @@ const levels = [
 ];
 
 const Lessons = () => {
+  const navigate = useNavigate();
   const [lessons, setLessons] = useState({ A1: [], A2: [], B1: [], B2: [], C1: [], C2: [] });
   const location = useLocation(); // Get the current location to know which section is selected
 
   useEffect(() => {
     const fetchLessons = async () => {
       try {
-        const response = await fetch('https://lengo-vz4i.onrender.com/lessons');
+        const response = await fetch('https://lengo-vz4i.onrender.com/lessons', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-csrf-token': localStorage.getItem('csrfToken')
+          }
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            navigate('/login');
+            return;
+          }
+          throw new Error('Failed to fetch lessons');
+        }
+        
         const data = await response.json();
         const groupedLessons = levels.reduce((acc, level) => {
-          acc[level.id] = data.filter((lesson) => lesson.level === level.id);
+          acc[level.id] = Array.isArray(data) ? data.filter((lesson) => lesson.level === level.id) : [];
           return acc;
         }, {});
         setLessons(groupedLessons);

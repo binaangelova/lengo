@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import AdminNavbar from '../components/AdminNavbar';
 
 const levels = [
@@ -12,15 +12,30 @@ const levels = [
 ];
 
 const AddLesson = () => {
+  const navigate = useNavigate();
   const [lessons, setLessons] = useState({ A1: [], A2: [], B1: [], B2: [], C1: [], C2: [] });
 
   useEffect(() => {
     const fetchLessons = async () => {
       try {
-        const response = await fetch('https://lengo-vz4i.onrender.com/lessons');
+        const response = await fetch('https://lengo-vz4i.onrender.com/lessons', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-csrf-token': localStorage.getItem('csrfToken')
+          }
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            navigate('/login');
+            return;
+          }
+          throw new Error('Failed to fetch lessons');
+        }
+        
         const data = await response.json();
         const groupedLessons = levels.reduce((acc, level) => {
-          acc[level.id] = data.filter((lesson) => lesson.level === level.id);
+          acc[level.id] = Array.isArray(data) ? data.filter((lesson) => lesson.level === level.id) : [];
           return acc;
         }, {});
         setLessons(groupedLessons);

@@ -26,8 +26,13 @@ const EditLesson = () => {
           setLevel(data.level);
           setVocabulary(data.vocabulary);
           setGrammar(data.grammar);
-          setTestId(data.test);
-          setQuestions(data.test ? data.test.questions : []); // Assuming test data is available
+          if (data.test) {
+            setTestId(data.test);
+            setQuestions(data.test.questions || [{ question: '', options: ['', '', ''], correctAnswer: '' }]);
+          } else {
+            setTestId(null);
+            setQuestions([{ question: '', options: ['', '', ''], correctAnswer: '' }]);
+          }
         }
       } catch (err) {
         alert('Грешка при зареждане на урока.');

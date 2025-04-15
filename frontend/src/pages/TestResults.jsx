@@ -8,26 +8,72 @@ const TestResults = () => {
   const navigate = useNavigate();
   const { testResultId } = useParams();
   const [testResults, setTestResults] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchResults = async () => {
     try {
-      const response = await fetch(`https://lengo-vz4i.onrender.com/getTestResult/${testResultId}`);
+      const response = await fetch(`https://lengo-vz4i.onrender.com/getTestResult/${testResultId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-csrf-token': localStorage.getItem('csrfToken')
+        }
+      });
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch user details');
+        throw new Error('Failed to fetch test results');
       }
+      
       const data = await response.json();
-      console.log(data)
-      setTestResults(data)
+      setTestResults(data);
     } catch (error) {
       console.error(error);
+      setError('Грешка при зареждане на резултатите от теста.');
+    } finally {
+      setIsLoading(false);
     }
   };
+
   useEffect(() => {
     fetchResults();
   }, [testResultId]);
-  if (testResults === null) {
-    return <div>Loading...</div>;
+
+  if (isLoading) {
+    return (
+      <div className="bg-blue-100 min-h-screen flex flex-col items-center justify-center">
+        <div className="text-2xl text-blue-900">Зареждане...</div>
+      </div>
+    );
   }
+
+  if (error) {
+    return (
+      <div className="bg-blue-100 min-h-screen flex flex-col items-center justify-center">
+        <div className="text-xl text-red-600">{error}</div>
+        <button
+          onClick={() => navigate("/lessons")}
+          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl shadow-xl text-md font-semibold hover:bg-blue-800 transition duration-200"
+        >
+          Към уроците
+        </button>
+      </div>
+    );
+  }
+
+  if (!testResults) {
+    return (
+      <div className="bg-blue-100 min-h-screen flex flex-col items-center justify-center">
+        <div className="text-xl text-red-600">Не са намерени резултати.</div>
+        <button
+          onClick={() => navigate("/lessons")}
+          className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl shadow-xl text-md font-semibold hover:bg-blue-800 transition duration-200"
+        >
+          Към уроците
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-blue-100 min-h-screen flex flex-col">
       <Navbar />

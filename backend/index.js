@@ -23,10 +23,12 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Enhanced security middleware
 app.use(cors({
-  origin: ['https://lengo-learn.vercel.app', 'http://localhost:5173'], // Allow both production and development URLs
+  origin: ['https://lengo-learn.vercel.app', 'http://localhost:5173', 'https://lengo-vz4i.onrender.com'], // Allow production, development, and render URLs
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token']
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-csrf-token'],
+  exposedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400 // Cache preflight request results for 24 hours
 }));
 app.use(express.json({ limit: '10mb' })); // Limit payload size
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -42,14 +44,13 @@ const sanitizeMiddleware = require('./middleware/sanitize');
 app.use(sanitizeMiddleware);
 
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
+  contentSecurityPolicy: {    directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],  // Removed unsafe-inline
-      styleSrc: ["'self'"],   // Removed unsafe-inline
-      imgSrc: ["'self'"],     // Restricted to only same origin
-      connectSrc: ["'self'", "https://lengo-learn.vercel.app", "http://localhost:5173"],
-      formAction: ["'self'"], // Restrict form submissions to same origin
+      scriptSrc: ["'self'", "'unsafe-inline'"],  // Allow inline scripts for error handling
+      styleSrc: ["'self'", "'unsafe-inline'"],   // Allow inline styles
+      imgSrc: ["'self'", "data:", "blob:"],     // Allow data URLs and blob URLs
+      connectSrc: ["'self'", "https://lengo-learn.vercel.app", "http://localhost:5173", "https://lengo-vz4i.onrender.com"],
+      formAction: ["'self'", "https://lengo-vz4i.onrender.com"], // Allow form submissions to render domain
       frameAncestors: ["'none'"], // Prevent iframe embedding
       objectSrc: ["'none'"],  // Prevent object/embed elements
       baseUri: ["'self'"],    // Restrict base URI
@@ -169,7 +170,7 @@ app.post('/lessons', authenticateToken, isAdmin, validateLesson, async (req, res
 });
 
 // Endpoint for fetching all lessons
-app.get('/lessons', async (req, res) => {
+app.get('/lessons', authenticateToken, async (req, res) => {
   try {
     const lessons = await Lesson.find().populate('test', 'questions');
     res.json(lessons);
@@ -180,7 +181,7 @@ app.get('/lessons', async (req, res) => {
 });
 
 // Endpoint for fetching a lesson by ID
-app.get('/lessons/:id', async (req, res) => {
+app.get('/lessons/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -200,7 +201,7 @@ app.get('/lessons/:id', async (req, res) => {
 });
 
 // Backend: Fetch lessons by level
-app.get('/lessons/:level', async (req, res) => {
+app.get('/lessons/:level', authenticateToken, async (req, res) => {
   try {
     const { level } = req.params;
     const lessons = await Lesson.find({ level });
@@ -211,7 +212,7 @@ app.get('/lessons/:level', async (req, res) => {
 });
 
 
-app.get('/lessons/:levelId/:lessonName', async (req, res) => {
+app.get('/lessons/:levelId/:lessonName', authenticateToken, async (req, res) => {
   try {
     const { levelId, lessonName } = req.params;
     const lesson = await Lesson.findOne({ level: levelId, name: lessonName }).populate('test');
@@ -254,7 +255,7 @@ app.post('/tests', authenticateToken, isAdmin, validateTest, async (req, res) =>
 });
 
 // Endpoint for fetching all tests
-app.get('/tests', async (req, res) => {
+app.get('/tests', authenticateToken, isAdmin, async (req, res) => {
   try {
     const tests = await Test.find();
     res.json(tests);
@@ -264,27 +265,14 @@ app.get('/tests', async (req, res) => {
   }
 });
 
-app.get('/completed-tests', async (req, res) => {
+app.get('/completed-tests', authenticateToken, async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-
-    if (!token) {
-      return res.status(401).json({ error: 'Authentication token is required.' });
-    }
-
-    // Verify the token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch (error) {
-      return res.status(401).json({ error: 'Invalid or expired token.' });
-    }
-
-    // Extract user ID from the decoded token
-    const userId = decoded.id;
+    // User ID is already available from authenticateToken middleware
+    const userId = req.user.id;
     if (!userId) {
       return res.status(400).json({ error: 'Invalid token: user ID missing.' });
     }
+
     const completedTests = await TestResult.find({ userId }).populate('lessonId');
 
     res.json(completedTests);
@@ -294,18 +282,21 @@ app.get('/completed-tests', async (req, res) => {
   }
 });
 
-app.get('/completed-tests/:userId', async (req, res) => {
+app.get('/completed-tests/:userId', authenticateToken, async (req, res) => {
   try {
-    const { userId } = req.params; // Get userId from URL params
-
-    if (!userId) {
+    const requestedUserId = req.params.userId;
+    
+    if (!requestedUserId) {
       return res.status(400).json({ error: 'User ID is required.' });
     }
 
-    const completedTests = await TestResult.find({ userId }).populate('lessonId');
-
-    res.json(completedTests);
-  } catch (error) {
+    // Only allow admins to view other users' test results
+    if (requestedUserId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Unauthorized to view these test results' });
+    }
+    
+    const completedTests = await TestResult.find({ userId: requestedUserId }).populate('lessonId');
+    res.json(completedTests);  } catch (error) {
     console.error('Error fetching tests:', error);
     res.status(500).json({ error: 'Error fetching tests.' });
   }
@@ -336,7 +327,7 @@ app.put('/lessons/:id', authenticateToken, isAdmin, validateLesson, async (req, 
 });
 
 // Delete a lesson by ID
-app.delete('/lessons/:id', async (req, res) => {
+app.delete('/lessons/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     const lesson = await Lesson.findById(req.params.id);
     if (!lesson) {
@@ -358,7 +349,7 @@ app.delete('/lessons/:id', async (req, res) => {
 });
 
 
-app.put('/tests/:id', async (req, res) => {
+app.put('/tests/:id', authenticateToken, isAdmin, async (req, res) => {
   const testId = req.params.id;
   const { questions } = req.body;
 
@@ -419,7 +410,7 @@ app.post('/submitTestResults', authenticateToken, async (req, res) => {
 });
 
 
-app.get('/getTestResult/:testResultId', async (req, res) => {
+app.get('/getTestResult/:testResultId', authenticateToken, async (req, res) => {
   try {
     const { testResultId } = req.params;
 
@@ -578,7 +569,7 @@ app.get('/user', async (req, res) => {
 });
 
 // Endpoint to fetch all users
-app.get('/users', async (req, res) => {
+app.get('/users', authenticateToken, isAdmin, async (req, res) => {
   try {
     const users = await User.find({}, 'username _id');
     res.json(users);
@@ -589,7 +580,7 @@ app.get('/users', async (req, res) => {
 });
 
 // Endpoint to fetch a user by ID
-app.get('/users/:id', async (req, res) => {
+app.get('/users/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -612,13 +603,23 @@ app.get('/users/:id', async (req, res) => {
 app.delete('/users/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedUser = await User.findByIdAndDelete(id);
-    if (!deletedUser) {
+    
+    // Check if the user exists before attempting to delete
+    const userToDelete = await User.findById(id);
+    if (!userToDelete) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.json({ message: 'User deleted successfully' });
+
+    // Prevent deleting your own account if you're an admin
+    if (req.user.id === id) {
+      return res.status(403).json({ message: 'Cannot delete your own admin account' });
+    }
+
+    const deletedUser = await User.findByIdAndDelete(id);
+    res.status(200).json({ message: 'User deleted successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Error deleting user' });
+    console.error('Error in delete user endpoint:', error);
+    res.status(500).json({ message: 'Error deleting user', error: error.message });
   }
 });
 

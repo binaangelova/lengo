@@ -53,7 +53,11 @@ const EditLesson = () => {
     try {
       const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${lessonId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-csrf-token': localStorage.getItem('csrfToken')
+        },
         body: JSON.stringify(lesson),
       });
 
@@ -110,43 +114,40 @@ const EditLesson = () => {
   };
 
   const handleSaveTest = async () => {
-    console.log('Saving test...');
     setIsLoading(true);
 
-    // Ensure testId is a string
-    const id = testId._id ? testId._id : testId;
-    console.log('Extracted Test ID:', id);
+    // Extract test ID properly, handling both string and object cases
+    const id = typeof testId === 'object' ? testId._id : testId;
 
     if (!id || typeof id !== 'string' || !/^[0-9a-fA-F]{24}$/.test(id)) {
-        console.error('Invalid Test ID:', id);
-        alert('Invalid Test ID.');
+        setError('Invalid Test ID');
         setIsLoading(false);
         return;
     }
 
     const test = { questions };
-    console.log('Test data:', test);
 
     try {
         const response = await fetch(`https://lengo-vz4i.onrender.com/tests/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                'x-csrf-token': localStorage.getItem('csrfToken')
+            },
             body: JSON.stringify(test),
         });
-
-        console.log('Response status:', response.status);
 
         if (response.ok) {
             alert('Тестът е обновен успешно!');
         } else {
-            alert('Грешка при обновяване на теста.');
+            const errorData = await response.json();
+            setError(errorData.error || 'Грешка при обновяване на теста.');
         }
     } catch (err) {
-        console.error('Error:', err);
-        alert('Грешка при свързването със сървъра.');
+        setError('Грешка при свързването със сървъра.');
     } finally {
         setIsLoading(false);
-        console.log('Test save process completed.');
     }
 };
 

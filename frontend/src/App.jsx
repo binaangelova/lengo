@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -18,16 +18,46 @@ import EditLesson from './pages/EditLesson';
 import TestResults from './pages/TestResults';
 import AdminTestResults from './pages/AdminTestResults';
 
+const LoadingScreen = () => (
+  <div className="bg-blue-100 min-h-screen flex items-center justify-center">
+    <div className="text-2xl text-blue-900">Зареждане...</div>
+  </div>
+);
+
 // Protected route for regular users
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? children : <Navigate to="/login" />;
+  const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return children;
 };
 
 // Protected route for admin users
 const ProtectedAdminRoute = ({ children }) => {
-  const { isAuthenticated, user } = useAuth();
-  return isAuthenticated && user?.role === 'admin' ? children : <Navigate to="/login" />;
+  const { isAuthenticated, user, isLoading } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (!user?.role === 'admin') {
+    return <Navigate to="/home" replace />;
+  }
+
+  return children;
 };
 
 const App = () => {
@@ -36,17 +66,19 @@ const App = () => {
       <Router>
         <div className="App">
           <Routes>
-            {/* User Routes */}
+            {/* Public Routes */}
             <Route path="/" element={<Register />} />
             <Route path="/login" element={<Login />} />
+
+            {/* Protected User Routes */}
             <Route path="/home" element={<ProtectedRoute><Home /></ProtectedRoute>} />
             <Route path="/about" element={<ProtectedRoute><About /></ProtectedRoute>} />
             <Route path="/lessons" element={<ProtectedRoute><Lessons /></ProtectedRoute>} />
-            <Route path="/lesson/:levelId/:lessonName" element={<LessonTemplate />} />
+            <Route path="/lesson/:levelId/:lessonName" element={<ProtectedRoute><LessonTemplate /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/test-results/:testResultId" element={<TestResults />} />
+            <Route path="/test-results/:testResultId" element={<ProtectedRoute><TestResults /></ProtectedRoute>} />
             
-            {/* Admin Routes */}
+            {/* Protected Admin Routes */}
             <Route path="/admin" element={<ProtectedAdminRoute><Admin /></ProtectedAdminRoute>} />
             <Route path="/admin/users" element={<ProtectedAdminRoute><Users /></ProtectedAdminRoute>} />
             <Route path="/admin/add-lesson" element={<ProtectedAdminRoute><AddLesson /></ProtectedAdminRoute>} />
@@ -55,6 +87,21 @@ const App = () => {
             <Route path="/admin/lessons/:levelId/:lessonName" element={<ProtectedAdminRoute><AdminLessonTemplate /></ProtectedAdminRoute>} />
             <Route path="/admin/edit-lesson/:lessonId" element={<ProtectedAdminRoute><EditLesson /></ProtectedAdminRoute>} />
             <Route path="/admin/admin-test-results/:testResultId" element={<ProtectedAdminRoute><AdminTestResults /></ProtectedAdminRoute>} />
+
+            {/* Catch-all route for 404 */}
+            <Route path="*" element={
+              <div className="bg-blue-100 min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                  <h1 className="text-4xl text-blue-900 mb-4">404 - Страницата не е намерена</h1>
+                  <button 
+                    onClick={() => navigate(-1)} 
+                    className="bg-blue-600 text-white py-2 px-4 rounded-xl hover:bg-blue-800 transition duration-200"
+                  >
+                    Назад
+                  </button>
+                </div>
+              </div>
+            } />
           </Routes>
         </div>
       </Router>

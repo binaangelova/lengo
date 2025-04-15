@@ -1,24 +1,45 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminNavbar from '../components/Navbar';
+import { useAuth } from '../AuthContext';
 
 const LessonTemplate = () => {
   const { levelId, lessonName } = useParams();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [lesson, setLesson] = useState(null);
   const [selectedAnswers, setSelectedAnswers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const modalRef = useRef(null);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
     const fetchLesson = async () => {
-      const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${levelId}/${lessonName}`);
-      const data = await response.json();
-      setLesson(data);
+      try {
+        const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${levelId}/${lessonName}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-csrf-token': localStorage.getItem('csrfToken')
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch lesson');
+        }
+        
+        const data = await response.json();
+        setLesson(data);
+      } catch (error) {
+        console.error('Error fetching lesson:', error);
+      }
     };
 
     fetchLesson();
-  }, [levelId, lessonName]);
+  }, [levelId, lessonName, isAuthenticated, navigate]);
 
   const handleAnswerChange = (questionIndex, selectedOption) => {
     const updatedAnswers = [...selectedAnswers];
@@ -27,36 +48,49 @@ const LessonTemplate = () => {
   };
 
   const handleSubmit = async () => {
-    console.log('Test submitted with answers:', selectedAnswers);
+    // Validate that all questions are answered
+    const unansweredQuestions = selectedAnswers.reduce((acc, answer, index) => {
+      if (!answer) acc.push(index + 1);
+      return acc;
+    }, []);
+
+    if (unansweredQuestions.length > 0) {
+      alert(`Моля, отговорете на следните въпроси: ${unansweredQuestions.join(', ')}`);
+      return;
+    }
+
     try {
       const response = await fetch('https://lengo-vz4i.onrender.com/submitTestResults', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-csrf-token': localStorage.getItem('csrfToken')
         },
         body: JSON.stringify({
           lessonId: lesson._id,
-          answers: selectedAnswers,
-          token: localStorage.getItem('token'),
+          answers: selectedAnswers
         }),
       });
 
-      const result = await response.json();
-      if (response.ok) {
-        navigate(`/test-results/${result._id}`, {
-          state: {
-            lessonName,
-            questions: lesson.test.questions,
-            selectedAnswers,
-            correctAnswers: lesson.test.questions.map(q => q.correctAnswer),
-            resultId: result._id,
-          },
-        });
-      } else {
-        alert('Грешка при изпращането на теста.');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit test');
       }
+
+      const result = await response.json();
+      setIsModalOpen(false);
+      navigate(`/test-results/${result._id}`, {
+        state: {
+          lessonName: lesson.name,
+          questions: lesson.test.questions,
+          selectedAnswers,
+          correctAnswers: lesson.test.questions.map(q => q.correctAnswer)
+        }
+      });
     } catch (error) {
       console.error('Error submitting test:', error);
+      alert('Възникна грешка при изпращане на теста. Моля, опитайте отново.');
     }
   };
 

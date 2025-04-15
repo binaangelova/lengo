@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import registerImage from '../images/loginimage3.jpg';
 import { Eye, EyeOff } from 'lucide-react'; // Import eye icons
+import { createRateLimiter } from '../utils/rateLimit';
 
 const Login = () => {
   const { login, isAuthenticated } = useAuth();
@@ -10,6 +11,8 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); // State for password visibility
   const [error, setError] = useState(null);
+  const [isThrottled, setIsThrottled] = useState(false);
+  const rateLimiter = useMemo(() => createRateLimiter(5, 60000), []); // 5 requests per minute
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,6 +25,13 @@ const Login = () => {
     e.preventDefault();
     setError(null);
 
+    if (!rateLimiter.tryRequest()) {
+      setIsThrottled(true);
+      setError('Твърде много опити. Моля, изчакайте малко преди да опитате отново.');
+      setTimeout(() => setIsThrottled(false), 60000);
+      return;
+    }
+
     try {
       const response = await fetch('https://lengo-vz4i.onrender.com/login', {
         method: 'POST',
@@ -31,14 +41,18 @@ const Login = () => {
 
       const data = await response.json();
       if (response.ok) {
+        // Store CSRF token securely
+        if (data.csrfToken) {
+          localStorage.setItem('csrfToken', data.csrfToken);
+        }
         login(data.token);
         navigate('/home');
       } else {
-        setError(data.error || 'An error occurred during login.');
+        setError(data.error || 'Грешка при влизане.');
       }
     } catch (err) {
       console.error('Network error:', err);
-      setError('Failed to connect to the server.');
+      setError('Грешка при свързване със сървъра.');
     }
   };
 
@@ -85,6 +99,7 @@ const Login = () => {
             <button 
               type="submit" 
               className="bg-blue-500 font-semibold text-white p-3 rounded-lg shadow-lg hover:bg-blue-700 hover:scale-105 transition duration-200"
+              disabled={isThrottled} // Disable button when throttled
             >
               Login
             </button>

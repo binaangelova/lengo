@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';  // Импортиране на Link
+import { useParams, Link, useNavigate } from 'react-router-dom';  // Импортиране на Link
 import AdminNavbar from '../components/AdminNavbar';
 
 const AdminLessonTemplate = () => {
@@ -7,13 +7,40 @@ const AdminLessonTemplate = () => {
   const [lesson, setLesson] = useState(null);
   const [selectedAnswers, setSelectedAnswers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [vocabulary, setVocabulary] = useState([]); // Added state for vocabulary
   const modalRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchLesson = async () => {
-      const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${levelId}/${lessonName}`);
-      const data = await response.json();
-      setLesson(data); 
+      try {
+        const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${levelId}/${lessonName}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-csrf-token': localStorage.getItem('csrfToken')
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch lesson');
+        }
+
+        const data = await response.json();
+        setLesson(data);
+        if (data.test?.questions) {
+          setSelectedAnswers(new Array(data.test.questions.length).fill(''));
+        }
+        if (data.vocabulary) {
+          setVocabulary(data.vocabulary); // Initialize vocabulary state
+        }
+      } catch (error) {
+        console.error('Error fetching lesson:', error);
+        setError('Грешка при зареждане на урока');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchLesson();
@@ -32,8 +59,6 @@ const AdminLessonTemplate = () => {
     };
   }, []);
 
-  if (!lesson) return <div>Зареждам...</div>;
-
   const handleAnswerChange = (questionIndex, selectedOption) => {
     const updatedAnswers = [...selectedAnswers];
     updatedAnswers[questionIndex] = selectedOption;
@@ -44,12 +69,64 @@ const AdminLessonTemplate = () => {
     console.log('Test submitted with answers:', selectedAnswers);
   };
 
-  const findDuplicates = (vocabulary) => {
-    const wordCount = {};
-    vocabulary.forEach((word) => {
-      wordCount[word.english] = (wordCount[word.english] || 0) + 1;
+  // Add validation utilities
+  const validateWord = (word) => {
+    if (!word.bulgarian.trim() || !word.english.trim()) {
+      return 'Двете полета са задължителни';
+    }
+    if (/[0-9]/.test(word.bulgarian) || /[0-9]/.test(word.english)) {
+      return 'Думите не трябва да съдържат цифри';
+    }
+    return null;
+  };
+
+  const findDuplicateWords = (vocabulary) => {
+    const seen = new Set();
+    return vocabulary.filter(word => {
+      const key = `${word.english.toLowerCase()}-${word.bulgarian.toLowerCase()}`;
+      if (seen.has(key)) return true;
+      seen.add(key);
+      return false;
     });
-    return vocabulary.filter((word) => wordCount[word.english] > 1);
+  };
+
+  const handleVocabularyChange = (index, field, value) => {
+    const updatedVocabulary = [...vocabulary];
+    updatedVocabulary[index][field] = value;
+    
+    // Validate the changed word
+    const error = validateWord(updatedVocabulary[index]);
+    if (error) {
+      setError(`Ред ${index + 1}: ${error}`);
+    } else {
+      // Check for duplicates
+      const duplicates = findDuplicateWords(updatedVocabulary);
+      if (duplicates.length > 0) {
+        setError('Намерени са повтарящи се думи');
+      } else {
+        setError(null);
+      }
+    }
+    
+    setVocabulary(updatedVocabulary);
+  };
+
+  const handleAddVocabulary = () => {
+    // Validate current vocabulary before adding new entry
+    const hasErrors = vocabulary.some(word => validateWord(word));
+    const hasDuplicates = findDuplicateWords(vocabulary).length > 0;
+    
+    if (hasErrors) {
+      setError('Моля, попълнете правилно всички думи преди да добавите нови');
+      return;
+    }
+    
+    if (hasDuplicates) {
+      setError('Моля, премахнете повтарящите се думи преди да добавите нови');
+      return;
+    }
+    
+    setVocabulary([...vocabulary, { bulgarian: '', english: '' }]);
   };
 
   const handleDelete = async () => {
@@ -73,7 +150,52 @@ const AdminLessonTemplate = () => {
   };
   
 
-  const duplicateWords = findDuplicates(lesson.vocabulary || []);
+  if (isLoading) {
+    return (
+      <div className="bg-blue-100 min-h-screen flex flex-col">
+        <AdminNavbar />
+        <div className="flex-grow flex items-center justify-center">
+          <div className="text-2xl text-blue-900">Зареждане...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-blue-100 min-h-screen flex flex-col">
+        <AdminNavbar />
+        <div className="flex-grow flex flex-col items-center justify-center">
+          <div className="text-xl text-red-600 mb-4">{error}</div>
+          <button
+            onClick={() => navigate('/admin/add-lesson')}
+            className="px-6 py-2 bg-blue-600 text-white rounded-xl shadow-xl text-md font-semibold hover:bg-blue-800 transition duration-200"
+          >
+            Назад към уроците
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!lesson) {
+    return (
+      <div className="bg-blue-100 min-h-screen flex flex-col">
+        <AdminNavbar />
+        <div className="flex-grow flex flex-col items-center justify-center">
+          <div className="text-xl text-red-600 mb-4">Урокът не е намерен</div>
+          <button
+            onClick={() => navigate('/admin/add-lesson')}
+            className="px-6 py-2 bg-blue-600 text-white rounded-xl shadow-xl text-md font-semibold hover:bg-blue-800 transition duration-200"
+          >
+            Назад към уроците
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const duplicateWords = findDuplicateWords(lesson.vocabulary || []);
 
   return (
     <div className="bg-blue-100 min-h-screen flex flex-col">

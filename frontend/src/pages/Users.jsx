@@ -31,19 +31,30 @@ const Users = () => {
   };
 
   const handleDelete = async (id) => {
+    if (!window.confirm('Сигурни ли сте, че искате да изтриете този потребител?')) {
+      return;
+    }
+
     try {
       const response = await fetch(`https://lengo-vz4i.onrender.com/users/${id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-csrf-token': localStorage.getItem('csrfToken')
+        }
       });
-  
+
       if (!response.ok) {
-        throw new Error('Failed to delete user');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete user');
       }
-  
+
       // Remove the deleted user from state
       setUsers(users.filter((user) => user._id !== id));
+      alert('Потребителят е изтрит успешно.');
     } catch (error) {
       console.error('Error deleting user:', error);
+      alert(`Грешка при изтриване на потребителя: ${error.message}`);
     }
   };
   

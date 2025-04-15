@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminNavbar from '../components/AdminNavbar';
 
 const LessonEditor = () => {
@@ -10,6 +10,7 @@ const LessonEditor = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [questions, setQuestions] = useState([{ question: '', options: ['', '', ''], correctAnswer: '' }]);
   const [error, setError] = useState(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const handleTestSave = (testId) => {
     setTestId(testId); // Save the test ID after saving the test
@@ -23,10 +24,21 @@ const LessonEditor = () => {
     }
   };
 
-  const handleVocabularyChange = (index, field, value) => {
-    const updatedVocabulary = [...vocabulary];
-    updatedVocabulary[index][field] = value;
-    setVocabulary(updatedVocabulary);
+  // Add change detection to all form changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const handleFormChange = () => {
+    setHasUnsavedChanges(true);
   };
 
   const handleSaveLesson = async () => {
@@ -46,18 +58,23 @@ const LessonEditor = () => {
     try {
       const response = await fetch('https://lengo-vz4i.onrender.com/lessons', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-csrf-token': localStorage.getItem('csrfToken')
+        },
         body: JSON.stringify(lesson),
       });
 
       if (response.ok) {
+        setHasUnsavedChanges(false);
         setLessonName('');
         setLevel('A1');
         setVocabulary([{ bulgarian: '', english: '' }]);
         setGrammar('');
         setTestId(null);
       } else {
-        alert('Грешка при запазване на урока.');
+        throw new Error('Failed to save lesson');
       }
     } catch (err) {
       alert('Грешка при свързването със сървъра.');
@@ -70,22 +87,26 @@ const LessonEditor = () => {
     const updatedQuestions = [...questions];
     updatedQuestions[index].question = value;
     setQuestions(updatedQuestions);
+    handleFormChange();
   };
 
   const handleOptionChange = (index, optionIndex, value) => {
     const updatedQuestions = [...questions];
     updatedQuestions[index].options[optionIndex] = value;
     setQuestions(updatedQuestions);
+    handleFormChange();
   };
 
   const handleCorrectAnswerChange = (index, correctAnswer) => {
     const updatedQuestions = [...questions];
     updatedQuestions[index].correctAnswer = correctAnswer;
     setQuestions(updatedQuestions);
+    handleFormChange();
   };
 
   const handleAddQuestion = () => {
     setQuestions([...questions, { question: '', options: ['', '', ''], correctAnswer: '' }]);
+    handleFormChange();
   };
 
   const handleReset = () => {
@@ -101,30 +122,109 @@ const LessonEditor = () => {
     return isValid;
   };
 
-  const handleSaveTest = async () => {
-    if (validateForm()) {
-      setIsLoading(true);
-      try {
-        const response = await fetch('https://lengo-vz4i.onrender.com/tests', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ questions }),
-        });
+  const validateTest = () => {
+    const errors = [];
 
-        if (response.ok) {
-          const { _id } = await response.json();
-          handleTestSave(_id);
-          handleReset(); // Reset the form after successful save
-        } else {
-          const errorData = await response.json();
-          setError(errorData.error || 'Възникна грешка при запазването на теста.');
-        }
-      } catch (err) {
-        setError('Сървърна грешка.');
-      } finally {
-        setIsLoading(false);
-      }
+    if (!questions || questions.length === 0) {
+      errors.push('Добавете поне един въпрос.');
+      return errors;
     }
+
+    questions.forEach((question, index) => {
+      if (!question.question.trim()) {
+        errors.push(`Въпрос ${index + 1}: Въпросът е задължителен.`);
+      }
+
+      // Check for duplicate options
+      const uniqueOptions = new Set(question.options.map(opt => opt.trim()));
+      if (uniqueOptions.size !== question.options.length) {
+        errors.push(`Въпрос ${index + 1}: Има повтарящи се отговори.`);
+      }
+
+      // Check for empty options
+      question.options.forEach((option, optIndex) => {
+        if (!option.trim()) {
+          errors.push(`Въпрос ${index + 1}: Отговор ${optIndex + 1} е празен.`);
+        }
+      });
+
+      // Validate correct answer
+      if (!question.correctAnswer) {
+        errors.push(`Въпрос ${index + 1}: Изберете правилен отговор.`);
+      } else if (!question.options.includes(question.correctAnswer)) {
+        errors.push(`Въпрос ${index + 1}: Правилният отговор трябва да е един от възможните отговори.`);
+      }
+    });
+
+    return errors;
+  };
+
+  const handleSaveTest = async () => {
+    setIsLoading(true);
+    const validationErrors = validateTest();
+
+    if (validationErrors.length > 0) {
+      setError(validationErrors.join('\n'));
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('https://lengo-vz4i.onrender.com/tests', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'x-csrf-token': localStorage.getItem('csrfToken')
+        },
+        body: JSON.stringify({ questions }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Грешка при запазване на теста');
+      }
+
+      const { _id } = await response.json();
+      handleTestSave(_id);
+      handleReset();
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Грешка при свързване със сървъра');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Update input handlers to track changes
+  const handleLessonNameChange = (e) => {
+    setLessonName(e.target.value);
+    handleFormChange();
+  };
+
+  const handleLevelChange = (e) => {
+    setLevel(e.target.value);
+    handleFormChange();
+  };
+
+  const handleVocabularyChange = (index, field, value) => {
+    const updatedVocabulary = [...vocabulary];
+    updatedVocabulary[index][field] = value;
+    setVocabulary(updatedVocabulary);
+    handleFormChange();
+  };
+
+  const handleGrammarChange = (e) => {
+    setGrammar(e.target.value);
+    handleFormChange();
+  };
+
+  // Navigation confirmation
+  const handleNavigateAway = () => {
+    if (hasUnsavedChanges) {
+      return window.confirm('Имате незапазени промени. Сигурни ли сте, че искате да напуснете?');
+    }
+    return true;
   };
 
   return (
@@ -141,7 +241,7 @@ const LessonEditor = () => {
             <input
               type="text"
               value={lessonName}
-              onChange={(e) => setLessonName(e.target.value)}
+              onChange={handleLessonNameChange}
               placeholder="Въведете име на урока"
               className="w-full p-2 border border-gray-400 rounded-lg shadow-md"
             />
@@ -150,7 +250,7 @@ const LessonEditor = () => {
             <label className="block text-3xl font-bold mb-4 text-blue-900">Ниво</label>
             <select
               value={level}
-              onChange={(e) => setLevel(e.target.value)}
+              onChange={handleLevelChange}
               className="w-full p-2 border border-gray-400 rounded-lg shadow-md"
             >
               <option value="A1">A1</option>
@@ -192,7 +292,7 @@ const LessonEditor = () => {
             <h2 className="text-3xl font-bold mb-4 text-blue-900">Граматика</h2>
             <textarea
               value={grammar}
-              onChange={(e) => setGrammar(e.target.value)}
+              onChange={handleGrammarChange}
               placeholder="Добавете текст за граматика"
               className="w-full p-4 border border-gray-400 rounded-lg shadow-md"
               rows="5"

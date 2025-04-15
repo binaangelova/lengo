@@ -13,14 +13,27 @@ const UserDetail = () => {
     // Fetch user details
     const fetchUser = async () => {
       try {
-        const response = await fetch(`https://lengo-vz4i.onrender.com/users/${userId}`);
+        const response = await fetch(`https://lengo-vz4i.onrender.com/users/${userId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-csrf-token': localStorage.getItem('csrfToken')
+          }
+        });
         if (!response.ok) {
+          if (response.status === 401) {
+            // Token expired or invalid
+            navigate('/login');
+            return;
+          }
           throw new Error('Failed to fetch user details');
         }
         const data = await response.json();
         setUser(data);
       } catch (error) {
-        console.error(error);
+        console.error('Error fetching user details:', error);
+        if (error.message.includes('401')) {
+          navigate('/login');
+        }
       }
     };
 
@@ -36,13 +49,21 @@ const UserDetail = () => {
         });
 
         if (!response.ok) {
+          if (response.status === 401) {
+            // Token expired or invalid
+            navigate('/login');
+            return;
+          }
           throw new Error('Failed to fetch completed tests');
         }
 
         const data = await response.json();
         setCompletedTests(data);
       } catch (error) {
-        console.error(error);
+        console.error('Error fetching completed tests:', error);
+        if (error.message.includes('401')) {
+          navigate('/login');
+        }
       }
     };
 

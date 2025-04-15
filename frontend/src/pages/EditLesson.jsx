@@ -19,7 +19,27 @@ const EditLesson = () => {
   useEffect(() => {
     const fetchLesson = async () => {
       try {
-        const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${lessonId}`);
+        const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${lessonId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-csrf-token': localStorage.getItem('csrfToken')
+          }
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            alert('Сесията ви е изтекла. Моля, влезте отново.');
+            navigate('/login');
+            return;
+          }
+          if (response.status === 404) {
+            alert('Урокът не е намерен.');
+            navigate('/admin/add-lesson');
+            return;
+          }
+          throw new Error('Failed to fetch lesson');
+        }
+
         const data = await response.json();
         if (data) {
           setLessonName(data.name);
@@ -46,10 +66,11 @@ const EditLesson = () => {
         }
       } catch (err) {
         alert('Грешка при зареждане на урока.');
+        navigate('/admin/add-lesson');
       }
     };
     fetchLesson();
-  }, [lessonId]);
+  }, [lessonId, navigate]);
 
   const handleSaveLesson = async () => {
     if (

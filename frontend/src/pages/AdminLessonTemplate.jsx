@@ -134,11 +134,15 @@ const AdminLessonTemplate = () => {
       try {
         const response = await fetch(`https://lengo-vz4i.onrender.com/lessons/${lesson._id}`, {
           method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-csrf-token': localStorage.getItem('csrfToken')
+          }
         });
   
         if (response.ok) {
           alert('Урокът беше изтрит успешно!');
-          window.location.href = '/admin'; // Redirect after deletion
+          navigate('/admin/add-lesson'); // Use navigate instead of window.location
         } else {
           alert('Грешка при изтриване на урока.');
         }

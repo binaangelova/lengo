@@ -9,7 +9,12 @@ const Users = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const response = await fetch('https://lengo-vz4i.onrender.com/users');
+        const response = await fetch('https://lengo-vz4i.onrender.com/users', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'x-csrf-token': localStorage.getItem('csrfToken')
+          }
+        });
         if (!response.ok) {
           throw new Error('Failed to fetch users');
         }

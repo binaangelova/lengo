@@ -100,7 +100,7 @@ const AdminTestResults = () => {
         
         <div className="w-full max-w-3xl mx-auto p-6 bg-white rounded-xl shadow-xl mt-12">
           {testResults.questions.map((q, index) => (
-            <div key={index} className="mb-6 rounded-lg bg-gray-50">
+            <div key={index} className="mb-6 rounded-lg">
               <p className="text-lg font-semibold">{q.question}</p>
               <p
                 className={`text-lg ${
@@ -111,7 +111,7 @@ const AdminTestResults = () => {
               >
                 Отговор на потребителя: {testResults.selectedAnswers[index] || "Няма отговор"}
               </p>
-              <p className="text-lg text-blue-800 mt-1">
+              <p className="text-lg text-blue-800">
                 Правилен отговор: {testResults.correctAnswers[index]}
               </p>
             </div>

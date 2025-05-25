@@ -155,7 +155,7 @@ const LessonTemplate = () => {
         </button>
 
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+          <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
             <div
               ref={modalRef}
               className="bg-white p-6 rounded-lg shadow-lg w-full max-w-3xl mx-auto max-h-[90vh] overflow-y-auto"
